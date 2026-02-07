@@ -72,7 +72,7 @@ function parseLengthFromSize(str) {
   if (!matches || !matches.length) return 0;
   const last = matches[matches.length - 1].replace(",", ".");
   const num = Number(last);
-  return Number.isFinite(num) ? num : 0;
+  return Number.isFinite(num) ? Math.round(num) : 0;
 }
 
 function extractAngles(text) {

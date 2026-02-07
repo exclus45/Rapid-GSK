@@ -843,6 +843,7 @@ function buildExportGroups() {
   const groups = [];
 
   optimizeCache.groups.forEach((group) => {
+    const mode = group.mode;
     let selectedPieces = [];
     if (group.mode === "double") {
       const { paired } = buildDoublePairs(group.pieces);
@@ -858,42 +859,52 @@ function buildExportGroups() {
 
     if (!selectedPieces.length) return;
 
-    const map = new Map();
-    selectedPieces.forEach((piece) => {
-      const orderId = sanitizeDigits(piece.orderId);
-      const productId = sanitizeDigits(piece.productId);
-      const lengthMm = Number(piece.lengthMm || piece.length || 0);
-      if (!Number.isFinite(lengthMm) || lengthMm <= 0) return;
-      const angles = String(piece.angles || "").trim();
-      const key = `${orderId}|${productId}|${lengthMm}|${angles}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          orderId,
-          productId,
+    const items = [];
+    if (optimizeCache.lastExportResults && optimizeCache.lastExportResults.has(group.title)) {
+      const result = optimizeCache.lastExportResults.get(group.title);
+      result.bins.forEach((bin) => {
+        bin.parts.forEach((part) => {
+          const metaArr = Array.isArray(part.meta) ? part.meta : [part.meta];
+          const meta = metaArr[0] || {};
+          const lengthMm = Number(part.length || meta.lengthMm || 0);
+          if (!Number.isFinite(lengthMm) || lengthMm <= 0) return;
+          items.push({
+            orderId: sanitizeDigits(meta.orderId),
+            productId: sanitizeDigits(meta.productId),
+            lengthMm,
+            angles: String(meta.angles || "").trim(),
+            quantity: 1,
+            widthMm: meta.widthMm || "",
+            heightMm: meta.heightMm || ""
+          });
+        });
+      });
+    } else {
+      selectedPieces.forEach((piece) => {
+        const lengthMm = Number(piece.lengthMm || piece.length || 0);
+        if (!Number.isFinite(lengthMm) || lengthMm <= 0) return;
+        items.push({
+          orderId: sanitizeDigits(piece.orderId),
+          productId: sanitizeDigits(piece.productId),
           lengthMm,
-          angles,
-          quantity: 0,
+          angles: String(piece.angles || "").trim(),
+          quantity: 1,
           widthMm: piece.widthMm || "",
           heightMm: piece.heightMm || ""
         });
-      }
-      map.get(key).quantity += 1;
-    });
-
-    const items = Array.from(map.values()).sort((a, b) => {
-      return (Number(b.lengthMm) || 0) - (Number(a.lengthMm) || 0);
-    });
+      });
+    }
     if (!items.length) return;
 
     const profileBase = extractProfileBase(group.profileCode);
-    const totalQty = items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const totalQty = selectedPieces.length;
 
     groups.push({
       title: group.title,
       profileBase,
       totalQty,
       items,
-      mode: group.mode
+      mode
     });
   });
 
@@ -972,13 +983,7 @@ function makeProgramBlock(orderNo, cutNo, profileCode, colorCode, pairMode, item
 function buildJobTextForGroup(group, cutNoOverride) {
   if (!group || !group.items || !group.items.length) return "";
   const orderNo = dateToOrderNo(cutDateInput?.value);
-  const items = group.mode === "double"
-    ? group.items.map((it) => ({
-        ...it,
-        quantity: Math.max(1, Math.floor((Number(it.quantity) || 0) / 2))
-      }))
-    : group.items;
-
+  const items = group.items;
   return makeProgramBlock(
     orderNo,
     cutNoOverride ?? EXPORT_CUT_NO,
@@ -1019,8 +1024,7 @@ function renderExport() {
       const sampleCode = `CZ${sampleOrder}P${sampleProduct}`;
       const orderNo = dateToOrderNo(cutDateInput?.value);
       const cutNo = padLeft(idx + 1, 4);
-      const pieceCount = g.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
-      const cutCount = g.mode === "double" ? Math.floor(pieceCount / 2) : pieceCount;
+      const cutCount = g.items.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
       const programCode = `P${orderNo}${cutNo}${padLeft(g.profileBase, 10)}${EXPORT_COLOR}${EXPORT_PAIR_MODE}${padLeft(cutCount, 3)}`;
       const disabledAttr = exportReady ? "" : "disabled";
       return `
@@ -1155,6 +1159,9 @@ optimizeBtn.addEventListener("click", () => {
 
   const leftoverSkewItems = buildLeftoverSkewItems(optimizeCache.groups);
 
+  optimizeCache.lastResults = new Map();
+  optimizeCache.lastExportResults = new Map();
+
   optimizeCache.groups.forEach((group) => {
     const modeLabel = group.mode === "double" ? "Двойной" : "Одинарный";
     if (!group.pieces.length) {
@@ -1171,12 +1178,16 @@ optimizeBtn.addEventListener("click", () => {
       const pairItems = paired.map((p) => ({ lengthMm: p.lengthMm, qty: 1, meta: p.meta }));
       const baseResult = window.optimizeCut(pairItems, DEFAULT_STOCK, DEFAULT_KERF);
       const result = splitPairedBins(baseResult);
+      optimizeCache.lastResults.set(group.title, result);
+      optimizeCache.lastExportResults.set(group.title, baseResult);
       appendOptimizeResult(group.title, result, DEFAULT_STOCK, DEFAULT_KERF, modeLabel);
       return;
     }
 
     const singleItems = group.pieces.map((p) => ({ lengthMm: p.lengthMm, qty: 1, meta: p }));
     const result = window.optimizeCut(singleItems, DEFAULT_STOCK, DEFAULT_KERF);
+    optimizeCache.lastResults.set(group.title, result);
+    optimizeCache.lastExportResults.set(group.title, result);
     appendOptimizeResult(group.title, result, DEFAULT_STOCK, DEFAULT_KERF, modeLabel);
   });
 
