@@ -123,6 +123,18 @@ function canonicalGroupName(part) {
   if (isXs35801 && isProwinDoor) {
     return "Рама оконная 63 мм (ProWin)";
   }
+  if (nameKey.includes("створкадвернаят106мм")) {
+    return "Створка дверная Т 106 мм (Experta T)";
+  }
+  if (nameKey.includes("створкадвернаят107мм") || nameKey.includes("створкадвернаяt107мм")) {
+    return "Створка дверная T 107 мм (Practica T)";
+  }
+  if (nameKey.includes("створкадвернаяz106мм")) {
+    return "Створка дверная Z 106 мм (Experta Z)";
+  }
+  if (nameKey.includes("створкадвернаяzобразная98мм")) {
+    return "Створка дверная Z образная 98 мм (Practica Z)";
+  }
   return nameRaw;
 }
 
@@ -917,7 +929,7 @@ function makeHeader(orderNo, cutNo, profileCode, color, pairMode, totalQty) {
   const prof = padLeft(profileCode, 10);
   const colorStr = String(color);
   const pairStr = String(pairMode);
-  const qty = padLeft(totalQty, 3);
+  const qty = "001";
   return "P" + order + cut + prof + colorStr + pairStr + qty;
 }
 
@@ -1003,6 +1015,11 @@ function safeFileName(value) {
   return base || "program";
 }
 
+function extractBracketName(title) {
+  const match = String(title || "").match(/\(([^)]+)\)/);
+  return match ? match[1].trim() : "";
+}
+
 function renderExport() {
   if (!exportBlocks) return;
   exportCache = buildExportGroups();
@@ -1080,7 +1097,11 @@ function renderExport() {
       const blob = new Blob([bytes], { type: "application/octet-stream" });
 
       const datePart = dateToOrderNo(cutDateInput?.value);
-      const suggestedName = `${datePart}_${safeFileName(group.title)}.job`;
+      const bracketName = extractBracketName(group.title);
+      const baseName = bracketName
+        ? safeFileName(`${bracketName}_${group.profileBase}`)
+        : safeFileName(group.title);
+      const suggestedName = `${datePart}_${baseName}.job`;
       if (window.showSaveFilePicker) {
         const handle = await window.showSaveFilePicker({
           suggestedName,
