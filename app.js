@@ -13,6 +13,7 @@ appEl.innerHTML = `
         <input id="csvInput" type="file" accept=".csv,.txt" multiple />
         <label class="import-btn" for="csvInput">Импорт</label>
         <button id="clearBtn" type="button" class="btn-secondary">Очистить</button>
+        <button id="printImportBtn" type="button" class="btn-secondary">Печать</button>
       </div>
       <div id="dropZone">Перетащите файлы сюда или выберите через кнопку выше</div>
       <div id="fileList"></div>
@@ -20,7 +21,7 @@ appEl.innerHTML = `
 
     <div class="card">
       <h2 class="center-heading">Всего элементов: <span id="totalCount">0</span></h2>
-      <div id="tableWrap"></div>
+      <div id="tableWrap" class="import-print-area"></div>
     </div>
   </div>
 
@@ -63,6 +64,7 @@ const optBlocks = document.getElementById("optBlocks");
 const optResults = document.getElementById("optResults");
 const optimizeBtn = document.getElementById("optimizeBtn");
 const printBtn = document.getElementById("printBtn");
+const printImportBtn = document.getElementById("printImportBtn");
 const saveBtn = document.getElementById("saveBtn");
 const cutDateInput = document.getElementById("cutDate");
 const exportBlocks = document.getElementById("exportBlocks");
@@ -1256,6 +1258,16 @@ if (cutDateInput) {
 if (printBtn) {
   printBtn.addEventListener("click", () => {
     window.print();
+  });
+}
+
+if (printImportBtn) {
+  printImportBtn.addEventListener("click", () => {
+    document.body.classList.add("print-import");
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove("print-import");
+    }, 100);
   });
 }
 

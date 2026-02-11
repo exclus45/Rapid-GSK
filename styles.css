@@ -418,6 +418,25 @@ th:nth-child(7), td:nth-child(7) { width: 10%; }
     padding: 0;
     box-shadow: none;
   }
+  body.print-import .print-area,
+  body.print-import .print-area * {
+    visibility: hidden;
+  }
+  body.print-import .import-print-area,
+  body.print-import .import-print-area * {
+    visibility: visible;
+  }
+  body.print-import .import-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    margin: 0;
+    border: none;
+    padding: 0;
+    box-shadow: none;
+  }
   body {
     margin: 0 !important;
     padding: 0 !important;
