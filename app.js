@@ -73,6 +73,17 @@ const exportTitle = document.getElementById("exportTitle");
 const DEFAULT_STOCK = 6500;
 const DEFAULT_KERF = 15;
 const DEFAULT_MODE = "double";
+const PROFILE_BAD_LEFTOVER_RULES = {
+  S35801: { scrapMax: 50, minUsefulLeftover: 650 },
+  XS35801: { scrapMax: 50, minUsefulLeftover: 650 },
+  S35816: { scrapMax: 50, minUsefulLeftover: 650 },
+  S57111: { scrapMax: 50, minUsefulLeftover: 650 },
+  S67011: { scrapMax: 50, minUsefulLeftover: 650 },
+  S35802: { scrapMax: 50, minUsefulLeftover: 550 },
+  S57122: { scrapMax: 50, minUsefulLeftover: 550 },
+  S67002: { scrapMax: 50, minUsefulLeftover: 550 },
+  XS35802: { scrapMax: 50, minUsefulLeftover: 550 }
+};
 const EXPORT_ORDER_NO = 1;
 const EXPORT_CUT_NO = 1;
 const EXPORT_COLOR = 0;
@@ -85,6 +96,30 @@ const filesMap = new Map();
 const contentHashes = new Set();
 let exportCache = [];
 let exportReady = false;
+
+function normalizeProfileRuleKey(profileCode) {
+  const base = extractProfileBase(profileCode || "");
+  return String(base)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function getOptimizeRulesForProfile(profileCode) {
+  const key = normalizeProfileRuleKey(profileCode);
+  return PROFILE_BAD_LEFTOVER_RULES[key] || null;
+}
+
+function getOptimizeRulesForPieces(pieces) {
+  let selected = null;
+  for (const piece of pieces || []) {
+    const rule = getOptimizeRulesForProfile(piece?.profileCode || "");
+    if (!rule) continue;
+    if (!selected || Number(rule.minUsefulLeftover) > Number(selected.minUsefulLeftover)) {
+      selected = rule;
+    }
+  }
+  return selected;
+}
 
 function sortParts(parts) {
   return [...parts].sort((a, b) => {
@@ -514,7 +549,8 @@ function expandPartsToPieces(parts) {
         orderId: String(p.orderId || "").trim(),
         productId: String(p.productId || "").trim(),
         title: String(p.name || "").trim(),
-        orient: String(p.orient || "").trim()
+        orient: String(p.orient || "").trim(),
+        profileCode: String(p.profileCode || "").trim()
       });
     }
   }
@@ -785,8 +821,7 @@ function formatOptimizeResult(result, stock, kerf) {
       .join("");
     const percent = stock > 0 ? (bin.leftover / stock) * 100 : 0;
     const percentText = `(${percent.toFixed(1)}%)`;
-    const percentClass =
-      percent <= 3 ? "percent-good" : percent <= 6 ? "percent-warn" : "percent-bad";
+    const percentClass = bin.leftover <= 50 ? "percent-scrap" : "percent-useful";
     lines.push(`
       <div class="opt-bin">
         <strong>Хлыст ${idx + 1}:</strong> ${parts}
@@ -1187,6 +1222,7 @@ optimizeBtn.addEventListener("click", () => {
 
   optimizeCache.groups.forEach((group) => {
     const modeLabel = group.mode === "double" ? "Двойной" : "Одинарный";
+    const optimizeRules = getOptimizeRulesForProfile(group.profileCode);
     if (!group.pieces.length) {
       appendOptimizeError(group.title, "Нет данных для расчета.", modeLabel);
       return;
@@ -1199,7 +1235,7 @@ optimizeBtn.addEventListener("click", () => {
         return;
       }
       const pairItems = paired.map((p) => ({ lengthMm: p.lengthMm, qty: 1, meta: p.meta }));
-      const baseResult = window.optimizeCut(pairItems, DEFAULT_STOCK, DEFAULT_KERF);
+      const baseResult = window.optimizeCut(pairItems, DEFAULT_STOCK, DEFAULT_KERF, optimizeRules);
       const result = splitPairedBins(baseResult);
       optimizeCache.lastResults.set(group.title, result);
       optimizeCache.lastExportResults.set(group.title, baseResult);
@@ -1208,7 +1244,7 @@ optimizeBtn.addEventListener("click", () => {
     }
 
     const singleItems = group.pieces.map((p) => ({ lengthMm: p.lengthMm, qty: 1, meta: p }));
-    const result = window.optimizeCut(singleItems, DEFAULT_STOCK, DEFAULT_KERF);
+    const result = window.optimizeCut(singleItems, DEFAULT_STOCK, DEFAULT_KERF, optimizeRules);
     optimizeCache.lastResults.set(group.title, result);
     optimizeCache.lastExportResults.set(group.title, result);
     appendOptimizeResult(group.title, result, DEFAULT_STOCK, DEFAULT_KERF, modeLabel);
@@ -1236,7 +1272,8 @@ optimizeBtn.addEventListener("click", () => {
   byTitleMap.forEach((pieces, title) => {
     if (!pieces.length) return;
     const items = pieces.map((p) => ({ lengthMm: p.lengthMm, qty: 1, meta: p }));
-    const result = window.optimizeCut(items, DEFAULT_STOCK, DEFAULT_KERF);
+    const optimizeRules = getOptimizeRulesForPieces(pieces);
+    const result = window.optimizeCut(items, DEFAULT_STOCK, DEFAULT_KERF, optimizeRules);
     appendOptimizeResult(`${title}`, result, DEFAULT_STOCK, DEFAULT_KERF, "Одинарный");
   });
 
@@ -1295,9 +1332,8 @@ if (saveBtn) {
     .opt-bin:last-child { border-bottom: none; }
     .opt-left { margin-left: 8px; color: #475569; }
     .opt-left-percent { font-weight: 700; }
-    .percent-good { color: #15803d; }
-    .percent-warn { color: #d97706; }
-    .percent-bad { color: #b42318; }
+    .percent-scrap { color: #1d4ed8; }
+    .percent-useful { color: #15803d; }
     .cut-chip { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 8px; margin-right: 6px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; font-weight: 700; text-align: center; min-width: 72px; }
     .cut-chip--skew { background: #111; border-color: #111; color: #fff; }
     .cut-chip-length { display: block; font-size: 16px; }
@@ -1327,3 +1363,4 @@ if (saveBtn) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 }
+

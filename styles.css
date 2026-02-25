@@ -469,16 +469,12 @@ th:nth-child(7), td:nth-child(7) { width: 10%; }
   font-weight: 700;
 }
 
-.percent-good {
+.percent-scrap {
+  color: #1d4ed8;
+}
+
+.percent-useful {
   color: #15803d;
-}
-
-.percent-warn {
-  color: #d97706;
-}
-
-.percent-bad {
-  color: #b42318;
 }
 
 .cut-chip {
@@ -836,3 +832,4 @@ body {
   font-weight: 400;
   color: #475569;
 }
+

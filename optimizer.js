@@ -1,9 +1,21 @@
-﻿/**
+/**
  * Simple cutting optimizer (best-fit decreasing).
  * items: [{ lengthMm, qty }]
+ * rules: { scrapMax, minUsefulLeftover } optional
  */
-function optimizeCut(items, stock, kerf) {
+function optimizeCut(items, stock, kerf, rules) {
   const parts = [];
+  const hasRules =
+    rules &&
+    Number.isFinite(Number(rules.scrapMax)) &&
+    Number.isFinite(Number(rules.minUsefulLeftover));
+  const scrapMax = hasRules ? Number(rules.scrapMax) : 0;
+  const minUsefulLeftover = hasRules ? Number(rules.minUsefulLeftover) : 0;
+
+  function isBadLeftover(leftover) {
+    if (!hasRules) return false;
+    return leftover > scrapMax && leftover < minUsefulLeftover;
+  }
 
   for (const it of items || []) {
     const length = Number(it.lengthMm || it.length || 0);
@@ -28,22 +40,50 @@ function optimizeCut(items, stock, kerf) {
     }
 
     let bestIdx = -1;
-    let bestRemain = Infinity;
+    let bestLeftover = Infinity;
+    let bestIsBad = true;
 
     for (let i = 0; i < bins.length; i++) {
       const remain = stock - bins[i].used;
-      if (part.size <= remain && remain - part.size < bestRemain) {
-        bestRemain = remain - part.size;
+      if (part.size > remain) continue;
+
+      const leftover = remain - part.size;
+      const bad = isBadLeftover(leftover);
+
+      if (bestIdx === -1) {
         bestIdx = i;
+        bestLeftover = leftover;
+        bestIsBad = bad;
+        continue;
+      }
+
+      if (bestIsBad && !bad) {
+        bestIdx = i;
+        bestLeftover = leftover;
+        bestIsBad = false;
+        continue;
+      }
+
+      if (bestIsBad === bad && leftover < bestLeftover) {
+        bestIdx = i;
+        bestLeftover = leftover;
       }
     }
 
     if (bestIdx === -1) {
       bins.push({ used: part.size, parts: [part] });
-    } else {
-      bins[bestIdx].used += part.size;
-      bins[bestIdx].parts.push(part);
+      continue;
     }
+
+    const newBinLeftover = stock - part.size;
+    const newBinIsBad = isBadLeftover(newBinLeftover);
+    if (hasRules && bestIsBad && !newBinIsBad) {
+      bins.push({ used: part.size, parts: [part] });
+      continue;
+    }
+
+    bins[bestIdx].used += part.size;
+    bins[bestIdx].parts.push(part);
   }
 
   const binsWithLeft = bins.map((bin) => ({
