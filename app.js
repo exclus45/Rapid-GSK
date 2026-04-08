@@ -71,7 +71,7 @@ const exportBlocks = document.getElementById("exportBlocks");
 const exportTitle = document.getElementById("exportTitle");
 
 const DEFAULT_STOCK = 6500;
-const DEFAULT_KERF = 15;
+const DEFAULT_KERF = 5;
 const DEFAULT_MODE = "double";
 const PROFILE_BAD_LEFTOVER_RULES = {
   S35801: { scrapMax: 50, minUsefulLeftover: 650 },
